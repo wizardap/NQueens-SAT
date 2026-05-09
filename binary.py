@@ -7,3 +7,5 @@ def at_most_one(clauses, variables):
 def exactly_one(clauses, variables):
     clauses.append(variables)
     at_most_one(clauses, variables)
+
+
