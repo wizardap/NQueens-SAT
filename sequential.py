@@ -20,7 +20,7 @@ def at_most_one(clauses,variables):
     """
     Activate: 1 <= i <= n-1, not x[i] or s[i] 
     Propagate: 2 <= i <= n-1, not s[i-1] or s[i]
-    Forbid second TRUE: 2 <= i <= n, not s[i-1] or -x[i]
+    Forbid second TRUE: 2 <= i <= n, not s[i-1] or not x[i]
 
     Notes: All indexs in this comment are 1-based index
     """
