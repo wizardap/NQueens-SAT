@@ -9,8 +9,38 @@ import math
 total_variables = 0
 
 
+def get_bit(mask, pos):
+    return (mask >> pos) & 1
+
+
 def generate_variables(n):
-    return [[i * n + j + 1 for j in range(n)] for i in range(n)]
+    return [[n * i + j + 1 for j in range(n)] for i in range(n)]
+
+
+def generate_binary_variables(end, length):
+    return [x for x in range(end, end + math.ceil(math.log2(length)))]
+
+
+def binary_encoding(clauses, target, bit_variables):
+    for bit_val in bit_variables:
+        clauses.append([-target, bit_val])
+        # print(f"-x[{target}] v {(bit_val//abs(bit_val))*(abs(bit_val)-63)}")
+
+
+def binary_AMO(clauses, variables):
+    global total_variables
+    binary_variables = generate_binary_variables(total_variables, len(variables))
+    total_variables += len(binary_variables)
+
+    for i, val in enumerate(variables):
+        bit_variables = []
+        for j, binary_val in enumerate(binary_variables):
+            bit = get_bit(i, j)
+            if bit == 1:
+                bit_variables.append(binary_val)
+            else:
+                bit_variables.append(-binary_val)
+        binary_encoding(clauses, val, bit_variables)
 
 
 def generate_commander_variables(end, length):
@@ -33,66 +63,32 @@ def naive_AMO(clauses, variables):
             clauses.append([-variables[i], -variables[j]])
 
 
-def naive_EO(clauses, variables):
+def bcmdr_AMO(clauses, variables):
+    global total_variables
+    group_num = math.ceil(math.sqrt(len(variables)))
+
+    groups = grouping_variables(variables, group_num)
+    binary_variables = generate_binary_variables(total_variables, len(groups))
+    total_variables += len(binary_variables)
+    for group in groups:
+        naive_AMO(clauses, group)
+
+    for i in range(len(groups)):
+        for h in range(len(groups[i])):
+            val = groups[i][h]
+            bit_variables = []
+            for j, binary_val in enumerate(binary_variables):
+                bit = get_bit(i, j)
+                if bit == 1:
+                    bit_variables.append(binary_val)
+                else:
+                    bit_variables.append(-binary_val)
+            binary_encoding(clauses, val, bit_variables)
+
+
+def bcmdr_EO(clauses, variables):
     clauses.append(variables)
-    naive_AMO(clauses, variables)
-
-
-def cmdr_AMO(clauses, variables):
-    global total_variables
-    if len(variables) <= 6:
-        naive_AMO(clauses, variables)
-        return
-
-    group_num = math.ceil(math.sqrt(len(variables)))
-    groups = grouping_variables(variables, group_num)
-    commander_variables = generate_commander_variables(total_variables, len(groups))
-    total_variables += len(groups)
-
-    for idx, group in enumerate(groups):
-
-        # 1. At most one variable in group can be true
-        naive_AMO(clauses, group)
-
-        # 2. If the commander variable of a group is true, then at least one of the variables in the group must be true.
-        # clauses.append([-commander_variables[idx]]+group)
-        # in AMO, we don't have this constraint
-
-        # 3. If the commander variable of a group is false, then none of the variables in the group can be true
-        for x in group:
-            clauses.append([commander_variables[idx], -x])
-
-    # 4. Exactly one of the commander variables is true
-    cmdr_AMO(clauses, commander_variables)
-
-
-def cmdr_EO(clauses, variables):
-    global total_variables
-
-    if len(variables) <= 6:
-        naive_EO(clauses, variables)
-        return
-
-    group_num = math.ceil(math.sqrt(len(variables)))
-    groups = grouping_variables(variables, group_num)
-
-    commander_variables = generate_commander_variables(total_variables, len(groups))
-    total_variables += len(groups)
-
-    for idx, group in enumerate(groups):
-
-        # 1. At most one variable in group can be true
-        naive_AMO(clauses, group)
-
-        # 2. If the commander variable of a group is true, then at least one of the variables in the group must be true.
-        clauses.append([-commander_variables[idx]] + group)
-
-        # 3. If the commander variable of a group is false, then none of the variables in the group can be true
-        for x in group:
-            clauses.append([commander_variables[idx], -x])
-
-    # 4. Exactly one of the commander variables is true
-    cmdr_EO(clauses, commander_variables)
+    bcmdr_AMO(clauses, variables)
 
 
 def generate_clauses(n):
@@ -104,11 +100,12 @@ def generate_clauses(n):
 
     # Exactly one queen in each row
     for row in range(n):
-        cmdr_EO(clauses, variables[row])
+        bcmdr_EO(clauses, variables[row])
+        # exit(0)
 
     # Exactly one queen in each column
     for col in range(n):
-        cmdr_EO(clauses, [variables[row][col] for row in range(n)])
+        bcmdr_EO(clauses, [variables[row][col] for row in range(n)])
 
     # At most one queen in each diagonal
     # Main diagonals
@@ -116,12 +113,12 @@ def generate_clauses(n):
         diag = [
             variables[i][j] for i in range(n) for j in range(n) if i - j == d - n + 1
         ]
-        cmdr_AMO(clauses, diag)
+        bcmdr_AMO(clauses, diag)
 
     # Anti-diagonals
     for d in range(2 * n - 1):
         diag = [variables[i][j] for i in range(n) for j in range(n) if i + j == d]
-        cmdr_AMO(clauses, diag)
+        bcmdr_AMO(clauses, diag)
 
     return clauses
 
@@ -193,7 +190,6 @@ def check_valid(solution):
 
 
 n = 91
-group_num = int(math.ceil(math.sqrt(n)))
 
 solution = solve_n_queens(n)
 # print_solution(solution)
