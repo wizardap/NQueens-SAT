@@ -192,7 +192,7 @@ n = 512
 solution = solve_n_queens(n)
 # print_solution(solution)
 
-if check_valid(solution):
-    print("Solution is valid.")
-else:
-    print("Solution is invalid.")
+# if check_valid(solution):
+#     print("Solution is valid.")
+# else:
+#     print("Solution is invalid.")
